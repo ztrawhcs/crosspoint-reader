@@ -232,6 +232,15 @@ void EpubReaderActivity::loop() {
   // Decrease Button (Short: Font-, Long: Spacing)
   if (mappedInput.wasReleased(btnFormatDec)) {
     xSemaphoreTake(renderingMutex, portMAX_DELAY);
+
+    // CRITICAL FIX: Save reading position before resetting the section!
+    // This prevents the "Out of bounds" error by telling the renderer how to scale the page number.
+    if (section) {
+      cachedSpineIndex = currentSpineIndex;
+      cachedChapterTotalPageCount = section->pageCount;
+      nextPageNumber = section->currentPage;
+    }
+
     if (mappedInput.getHeldTime() > formattingToggleMs) {
       // Long Press: Cycle Spacing
       SETTINGS.lineSpacing++;
@@ -273,6 +282,14 @@ void EpubReaderActivity::loop() {
     } else {
       // Short Press: Font Larger
       xSemaphoreTake(renderingMutex, portMAX_DELAY);
+
+      // CRITICAL FIX: Save reading position before resetting!
+      if (section) {
+        cachedSpineIndex = currentSpineIndex;
+        cachedChapterTotalPageCount = section->pageCount;
+        nextPageNumber = section->currentPage;
+      }
+
       if (SETTINGS.fontSize < CrossPointSettings::FONT_SIZE::EXTRA_LARGE) {
         SETTINGS.fontSize++;
       }
