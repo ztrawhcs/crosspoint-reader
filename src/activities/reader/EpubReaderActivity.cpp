@@ -225,6 +225,9 @@ void EpubReaderActivity::loop() {
 
   // "Left" button: Short Press = Font Smaller, Long Press = Cycle Line Spacing
   if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
+    // CRITICAL FIX: Lock the mutex before modifying data that the renderer uses!
+    xSemaphoreTake(renderingMutex, portMAX_DELAY);
+
     if (mappedInput.getHeldTime() > formattingToggleMs) {
       // Long Press: Cycle Line Spacing (Tight -> Normal -> Wide)
       SETTINGS.lineSpacing++;
@@ -239,13 +242,18 @@ void EpubReaderActivity::loop() {
       }
     }
     SETTINGS.saveToFile();
-    section.reset();  // Force re-render
+    section.reset();                 // Force re-render
+    xSemaphoreGive(renderingMutex);  // Release the lock
+
     updateRequired = true;
     return;  // Consume event
   }
 
   // "Right" button: Short Press = Font Larger, Long Press = Cycle Font Family
   if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
+    // CRITICAL FIX: Lock the mutex before modifying data that the renderer uses!
+    xSemaphoreTake(renderingMutex, portMAX_DELAY);
+
     if (mappedInput.getHeldTime() > formattingToggleMs) {
       // Long Press: Cycle Font Family (Bookerly -> Noto -> Dyslexic)
       SETTINGS.fontFamily++;
@@ -260,7 +268,9 @@ void EpubReaderActivity::loop() {
       }
     }
     SETTINGS.saveToFile();
-    section.reset();  // Force re-render
+    section.reset();                 // Force re-render
+    xSemaphoreGive(renderingMutex);  // Release the lock
+
     updateRequired = true;
     return;  // Consume event
   }
