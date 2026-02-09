@@ -129,6 +129,14 @@ void EpubReaderActivity::onExit() {
 }
 
 void EpubReaderActivity::loop() {
+  // --- POPUP AUTO-DISMISS LOGIC ---
+  // If a popup was shown and the timer has expired, trigger a refresh to wipe it.
+  static unsigned long clearPopupTimer = 0;
+  if (clearPopupTimer > 0 && millis() > clearPopupTimer) {
+    clearPopupTimer = 0;
+    updateRequired = true;
+  }
+
   // Pass input responsibility to sub activity if exists
   if (subActivity) {
     subActivity->loop();
@@ -234,7 +242,6 @@ void EpubReaderActivity::loop() {
     bool changed = false;
     bool limitReached = false;
 
-    // Take lock safely
     xSemaphoreTake(renderingMutex, portMAX_DELAY);
 
     if (mappedInput.getHeldTime() > formattingToggleMs) {
@@ -263,7 +270,6 @@ void EpubReaderActivity::loop() {
 
     if (changed) {
       // CRITICAL FIX: Only save and reset if something actually changed!
-      // This prevents the page from jumping if we hit the limit.
       if (section) {
         cachedSpineIndex = currentSpineIndex;
         cachedChapterTotalPageCount = section->pageCount;
@@ -278,8 +284,9 @@ void EpubReaderActivity::loop() {
     if (changed) {
       updateRequired = true;
     } else if (limitReached) {
-      // If limit reached, show popup but do NOT trigger a full reset/update
+      // Show popup and set timer to clear it in 1 second
       GUI.drawPopup(renderer, "Min Size Reached");
+      clearPopupTimer = millis() + 1000;
     }
     return;
   }
@@ -292,7 +299,6 @@ void EpubReaderActivity::loop() {
 
     if (mappedInput.getHeldTime() > formattingToggleMs) {
       // Long Press: Toggle Orientation (Portrait <-> Landscape CCW)
-      // applyOrientation handles its own locking, so we don't take mutex here yet.
       uint8_t newOrientation = (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT)
                                    ? CrossPointSettings::ORIENTATION::LANDSCAPE_CCW
                                    : CrossPointSettings::ORIENTATION::PORTRAIT;
@@ -325,7 +331,9 @@ void EpubReaderActivity::loop() {
     if (changed || orientationChanged) {
       updateRequired = true;
     } else if (limitReached) {
+      // Show popup and set timer to clear it in 1 second
       GUI.drawPopup(renderer, "Max Size Reached");
+      clearPopupTimer = millis() + 1000;
     }
     return;
   }
@@ -355,12 +363,7 @@ void EpubReaderActivity::loop() {
     return;
   }
 
-  // Note: For Chapter Skip, we use the held time of whichever button triggered the nav
-  // This is a slight simplification, assuming only one nav button is pressed at a time.
   const bool isHoldingNav = mappedInput.isPressed(btnNavPrev) || mappedInput.isPressed(btnNavNext);
-  // We check mappedInput.getHeldTime() but technically we should check specific buttons.
-  // However, getHeldTime() returns the time of the *last state change*, which works for single presses.
-  // For robustness, we check the global held time if a button is active.
   const bool skipChapter = SETTINGS.longPressChapterSkip && mappedInput.getHeldTime() > skipChapterMs;
 
   if (skipChapter) {
