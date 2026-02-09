@@ -20,6 +20,9 @@ namespace {
 // pagesPerRefresh now comes from SETTINGS.getRefreshFrequency()
 constexpr unsigned long skipChapterMs = 700;
 constexpr unsigned long goHomeMs = 1000;
+// New constant for formatting toggle (0.5 seconds)
+constexpr unsigned long formattingToggleMs = 500;
+
 constexpr int statusBarMargin = 19;
 constexpr int progressBarMarginTop = 1;
 
@@ -217,29 +220,49 @@ void EpubReaderActivity::loop() {
   }
 
   // =========================================================================================
-  // NEW LOGIC: FONT RESIZING
+  // NEW LOGIC: FONT & FORMATTING CONTROLS
   // =========================================================================================
 
-  // "Left" button decreases font size
+  // "Left" button: Short Press = Font Smaller, Long Press = Cycle Line Spacing
   if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
-    if (SETTINGS.fontSize > CrossPointSettings::FONT_SIZE::SMALL) {
-      SETTINGS.fontSize--;
-      SETTINGS.saveToFile();
-      section.reset();  // Force re-render of the book
-      updateRequired = true;
+    if (mappedInput.getHeldTime() > formattingToggleMs) {
+      // Long Press: Cycle Line Spacing (Tight -> Normal -> Wide)
+      SETTINGS.lineSpacing++;
+      if (SETTINGS.lineSpacing >= CrossPointSettings::LINE_COMPRESSION_COUNT) {
+        SETTINGS.lineSpacing = 0;
+      }
+      GUI.drawPopup(renderer, "Line Spacing Changed");  // Feedback
+    } else {
+      // Short Press: Decrease Font Size
+      if (SETTINGS.fontSize > CrossPointSettings::FONT_SIZE::SMALL) {
+        SETTINGS.fontSize--;
+      }
     }
-    return;  // Consume the event so it doesn't do anything else
+    SETTINGS.saveToFile();
+    section.reset();  // Force re-render
+    updateRequired = true;
+    return;  // Consume event
   }
 
-  // "Right" button increases font size
+  // "Right" button: Short Press = Font Larger, Long Press = Cycle Font Family
   if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
-    if (SETTINGS.fontSize < CrossPointSettings::FONT_SIZE::EXTRA_LARGE) {
-      SETTINGS.fontSize++;
-      SETTINGS.saveToFile();
-      section.reset();  // Force re-render of the book
-      updateRequired = true;
+    if (mappedInput.getHeldTime() > formattingToggleMs) {
+      // Long Press: Cycle Font Family (Bookerly -> Noto -> Dyslexic)
+      SETTINGS.fontFamily++;
+      if (SETTINGS.fontFamily >= CrossPointSettings::FONT_FAMILY_COUNT) {
+        SETTINGS.fontFamily = 0;
+      }
+      GUI.drawPopup(renderer, "Font Family Changed");  // Feedback
+    } else {
+      // Short Press: Increase Font Size
+      if (SETTINGS.fontSize < CrossPointSettings::FONT_SIZE::EXTRA_LARGE) {
+        SETTINGS.fontSize++;
+      }
     }
-    return;  // Consume the event so it doesn't do anything else
+    SETTINGS.saveToFile();
+    section.reset();  // Force re-render
+    updateRequired = true;
+    return;  // Consume event
   }
 
   // =========================================================================================
