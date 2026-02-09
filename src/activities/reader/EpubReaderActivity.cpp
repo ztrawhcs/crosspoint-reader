@@ -225,10 +225,10 @@ void EpubReaderActivity::loop() {
     if (SETTINGS.fontSize > CrossPointSettings::FONT_SIZE::SMALL) {
       SETTINGS.fontSize--;
       SETTINGS.saveToFile();
-      section.reset(); // Force re-render of the book
+      section.reset();  // Force re-render of the book
       updateRequired = true;
     }
-    return; // Consume the event so it doesn't do anything else
+    return;  // Consume the event so it doesn't do anything else
   }
 
   // "Right" button increases font size
@@ -236,10 +236,10 @@ void EpubReaderActivity::loop() {
     if (SETTINGS.fontSize < CrossPointSettings::FONT_SIZE::EXTRA_LARGE) {
       SETTINGS.fontSize++;
       SETTINGS.saveToFile();
-      section.reset(); // Force re-render of the book
+      section.reset();  // Force re-render of the book
       updateRequired = true;
     }
-    return; // Consume the event so it doesn't do anything else
+    return;  // Consume the event so it doesn't do anything else
   }
 
   // =========================================================================================
@@ -248,14 +248,14 @@ void EpubReaderActivity::loop() {
 
   // When long-press chapter skip is disabled, turn pages on press instead of release.
   const bool usePressForPageTurn = !SETTINGS.longPressChapterSkip;
-  
+
   // OLD CODE REMOVED: || mappedInput.wasPressed(MappedInputManager::Button::Left)
   const bool prevTriggered = usePressForPageTurn ? mappedInput.wasPressed(MappedInputManager::Button::PageBack)
                                                  : mappedInput.wasReleased(MappedInputManager::Button::PageBack);
 
   const bool powerPageTurn = SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::PAGE_TURN &&
                              mappedInput.wasReleased(MappedInputManager::Button::Power);
-  
+
   // OLD CODE REMOVED: || mappedInput.wasPressed(MappedInputManager::Button::Right)
   const bool nextTriggered = usePressForPageTurn
                                  ? (mappedInput.wasPressed(MappedInputManager::Button::PageForward) || powerPageTurn)
