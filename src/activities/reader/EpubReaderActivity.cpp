@@ -91,8 +91,8 @@ void drawHelpBox(const GfxRenderer& renderer, int x, int y, const char* text, bo
 
   // Fill White (Clear background)
   renderer.fillRect(drawX, drawY, boxWidth, boxHeight, false);
-  // Draw Border Black
-  renderer.drawRect(drawX, drawY, boxWidth, boxHeight, true);
+  // Draw Border Black (Thickness: 2)
+  renderer.drawRect(drawX, drawY, boxWidth, boxHeight, 2, true);
 
   // Draw each line
   for (size_t i = 0; i < lines.size(); i++) {
@@ -879,33 +879,26 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     const int w = renderer.getScreenWidth();
     const int h = renderer.getScreenHeight();
 
-    // Dim the reading background slightly if possible, or just draw on top
-    // Since we don't have alpha, we just draw readable boxes.
-
-    // NOTE: Coordinates are RAW screen pixels, need to respect orientation
-    // But since we are drawing absolute button labels, we want logical positions?
-    // Actually, renderer is already rotated. So (0,0) is top-left of *current view*.
-
     // Draw Center "Dismiss" instruction
     drawHelpBox(renderer, w / 2 - 50, h / 2 - 20, "PRESS ANY KEY\nTO DISMISS");
 
     if (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) {
       // PORTRAIT LABELS
       // Front Left (Bottom Left)
-      drawHelpBox(renderer, w - 160, h - 80, "1x: Size -\n2x: Align\nHold: Spacing", true);
+      drawHelpBox(renderer, w - 135, h - 80, "1x: Size —\nHold: Spacing\n2x: Alignment", true);
 
       // Front Right (Bottom Right)
-      drawHelpBox(renderer, w - 10, h - 80, "1x: Size +\n2x: AntiAlias\nHold: ROTATE", true);
+      drawHelpBox(renderer, w - 10, h - 80, "1x: Size +\nHold: ROTATE\n2x: AntiAlias", true);
 
     } else {
       // LANDSCAPE CCW LABELS
 
       // Top Buttons (Top Edge - configuration)
-      // Left (was Left) - Top Center (Right aligned)
-      drawHelpBox(renderer, w / 2 - 5, 20, "1x: Size -\n2x: Align\nHold: Spacing", true);
+      // Left (was Left)
+      drawHelpBox(renderer, w / 2 + 5, 20, "1x: Size —\nHold: Spacing\n2x: Alignment", true);
 
-      // Right (was Right) - Top Center (Left aligned)
-      drawHelpBox(renderer, w / 2 + 5, 20, "1x: Size +\n2x: AntiAlias\nHold: ROTATE", false);
+      // Right (was Right)
+      drawHelpBox(renderer, w / 2 + 15, 20, "1x: Size +\nHold: ROTATE\n2x: AntiAlias", false);
     }
   }
 
