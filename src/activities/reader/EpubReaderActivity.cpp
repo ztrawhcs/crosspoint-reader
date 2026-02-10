@@ -4,10 +4,9 @@
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
-
-#include <sstream>
-#include <string>
 #include <vector>
+#include <string>
+#include <sstream>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
@@ -70,33 +69,33 @@ void drawHelpBox(const GfxRenderer& renderer, int x, int y, const char* text, bo
   std::stringstream ss(text);
   std::string line;
   int maxWidth = 0;
-
+  
   while (std::getline(ss, line, '\n')) {
-    lines.push_back(line);
-    int w = renderer.getTextWidth(SMALL_FONT_ID, line.c_str());
-    if (w > maxWidth) maxWidth = w;
+      lines.push_back(line);
+      int w = renderer.getTextWidth(SMALL_FONT_ID, line.c_str());
+      if (w > maxWidth) maxWidth = w;
   }
 
-  int lineHeight = 20;  // Approx height for SMALL_FONT_ID
+  int lineHeight = 20; // Approx height for SMALL_FONT_ID
   int boxWidth = maxWidth + 10;
   int boxHeight = (lines.size() * lineHeight) + 10;
-
+  
   int drawX = alignRight ? (x - boxWidth) : x;
   int drawY = y;
 
   // Ensure we don't draw off the bottom edge
   if (drawY + boxHeight > renderer.getScreenHeight()) {
-    drawY = renderer.getScreenHeight() - boxHeight - 5;
+      drawY = renderer.getScreenHeight() - boxHeight - 5;
   }
 
   // Fill White (Clear background)
   renderer.fillRect(drawX, drawY, boxWidth, boxHeight, false);
   // Draw Border Black
   renderer.drawRect(drawX, drawY, boxWidth, boxHeight, true);
-
+  
   // Draw each line
   for (size_t i = 0; i < lines.size(); i++) {
-    renderer.drawText(SMALL_FONT_ID, drawX + 5, drawY + 5 + (i * lineHeight), lines[i].c_str());
+      renderer.drawText(SMALL_FONT_ID, drawX + 5, drawY + 5 + (i * lineHeight), lines[i].c_str());
   }
 }
 
@@ -302,8 +301,7 @@ void EpubReaderActivity::loop() {
     btnNavNext = MappedInputManager::Button::Right;
   }
 
-  // --- HANDLE FORMAT DEC (Left / Top) ---
-  // Actions: Short (Size-), Long (Spacing), Double (Anti-Alias)
+  // --- HANDLE FORMAT DEC ---
   bool executeFormatDecSingle = false;
 
   if (mappedInput.wasReleased(btnFormatDec)) {
@@ -335,7 +333,7 @@ void EpubReaderActivity::loop() {
       return;
     } else {
       if (waitingForFormatDec && (millis() - lastFormatDecRelease < doubleClickMs)) {
-        // DOUBLE CLICK: Toggle Anti-Aliasing (Swapped)
+        // DOUBLE CLICK: Toggle Alignment
         waitingForFormatDec = false;
         xSemaphoreTake(renderingMutex, portMAX_DELAY);
         if (section) {
@@ -343,12 +341,16 @@ void EpubReaderActivity::loop() {
           cachedChapterTotalPageCount = section->pageCount;
           nextPageNumber = section->currentPage;
         }
-        SETTINGS.textAntiAliasing = !SETTINGS.textAntiAliasing;
-        const char* aaMsg = SETTINGS.textAntiAliasing ? "Anti-Alias: ON" : "Anti-Alias: OFF";
+        if (SETTINGS.paragraphAlignment == CrossPointSettings::PARAGRAPH_ALIGNMENT::LEFT_ALIGN) {
+          SETTINGS.paragraphAlignment = CrossPointSettings::PARAGRAPH_ALIGNMENT::JUSTIFIED;
+          GUI.drawPopup(renderer, "Align: Justified");
+        } else {
+          SETTINGS.paragraphAlignment = CrossPointSettings::PARAGRAPH_ALIGNMENT::LEFT_ALIGN;
+          GUI.drawPopup(renderer, "Align: Left");
+        }
         SETTINGS.saveToFile();
         section.reset();
         xSemaphoreGive(renderingMutex);
-        GUI.drawPopup(renderer, aaMsg);
         clearPopupTimer = millis() + 1000;
         updateRequired = true;
         return;
@@ -392,8 +394,7 @@ void EpubReaderActivity::loop() {
     }
   }
 
-  // --- HANDLE FORMAT INC (Right / Top) ---
-  // Actions: Short (Size+), Long (Rotate), Double (Align)
+  // --- HANDLE FORMAT INC ---
   bool executeFormatIncSingle = false;
 
   if (mappedInput.wasReleased(btnFormatInc)) {
@@ -411,7 +412,7 @@ void EpubReaderActivity::loop() {
       return;
     } else {
       if (waitingForFormatInc && (millis() - lastFormatIncRelease < doubleClickMs)) {
-        // DOUBLE CLICK: Toggle Alignment (Swapped)
+        // DOUBLE CLICK: Toggle Anti-Aliasing
         waitingForFormatInc = false;
         xSemaphoreTake(renderingMutex, portMAX_DELAY);
         if (section) {
@@ -419,16 +420,12 @@ void EpubReaderActivity::loop() {
           cachedChapterTotalPageCount = section->pageCount;
           nextPageNumber = section->currentPage;
         }
-        if (SETTINGS.paragraphAlignment == CrossPointSettings::PARAGRAPH_ALIGNMENT::LEFT_ALIGN) {
-          SETTINGS.paragraphAlignment = CrossPointSettings::PARAGRAPH_ALIGNMENT::JUSTIFIED;
-          GUI.drawPopup(renderer, "Align: Justified");
-        } else {
-          SETTINGS.paragraphAlignment = CrossPointSettings::PARAGRAPH_ALIGNMENT::LEFT_ALIGN;
-          GUI.drawPopup(renderer, "Align: Left");
-        }
+        SETTINGS.textAntiAliasing = !SETTINGS.textAntiAliasing;
+        const char* aaMsg = SETTINGS.textAntiAliasing ? "Anti-Alias: ON" : "Anti-Alias: OFF";
         SETTINGS.saveToFile();
         section.reset();
         xSemaphoreGive(renderingMutex);
+        GUI.drawPopup(renderer, aaMsg);
         clearPopupTimer = millis() + 1000;
         updateRequired = true;
         return;
@@ -886,35 +883,21 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
 
     if (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) {
       // PORTRAIT LABELS
-
-      // Side Buttons (Right Edge)
-      // Top button (Prev)
-      drawHelpBox(renderer, w - 10, 100, "Prev Page", true);
-
-      // Bottom button (Next) - adjusted to be further down
-      drawHelpBox(renderer, w - 10, 250, "Next Page", true);
-
       // Front Left (Bottom Left)
-      drawHelpBox(renderer, 20, h - 80, "1x: Size -\n2x: AntiAlias\nHold: Space");
+      drawHelpBox(renderer, 20, h - 80, "1x: Size -\n2x: Align\nHold: Spacing");
 
       // Front Right (Bottom Right)
-      drawHelpBox(renderer, w - 20, h - 80, "1x: Size +\n2x: Align\nHold: ROTATE", true);
+      drawHelpBox(renderer, w - 20, h - 80, "1x: Size +\n2x: AntiAlias\nHold: ROTATE", true);
 
     } else {
       // LANDSCAPE CCW LABELS
-
+      
       // Top Buttons (Top Edge - configuration)
       // Left (was Left)
-      drawHelpBox(renderer, 20, 20, "1x: Size -\n2x: AntiAlias\nHold: Space");
-
+      drawHelpBox(renderer, 20, 20, "1x: Size -\n2x: Align\nHold: Spacing");
+      
       // Right (was Right)
-      drawHelpBox(renderer, w - 20, 20, "1x: Size +\n2x: Align\nHold: ROTATE", true);
-
-      // Right Buttons (Right Edge - navigation)
-      // Top (was Prev)
-      drawHelpBox(renderer, w - 10, 80, "Prev Page", true);
-      // Bottom (was Next)
-      drawHelpBox(renderer, w - 10, 220, "Next Page", true);
+      drawHelpBox(renderer, w - 20, 20, "1x: Size +\n2x: AntiAlias\nHold: ROTATE", true);
     }
   }
 
