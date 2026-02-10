@@ -898,12 +898,19 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     const int h = renderer.getScreenHeight();
 
     // Draw Center "Dismiss" instruction
-    drawHelpBox(renderer, w / 2 + 25, 220, "PRESS ANY KEY\nTO DISMISS", BoxAlign::CENTER);
+    // Landscape: y = 250 (lowered)
+    // Portrait: y = 300 (hardcoded vertical center-ish)
+    int dismissY = (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) ? 300 : 250;
+    
+    // Landscape adjustment for center
+    int dismissX = (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) ? w / 2 : w / 2 + 25;
+
+    drawHelpBox(renderer, dismissX, dismissY, "PRESS ANY KEY\nTO DISMISS", BoxAlign::CENTER);
 
     if (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) {
       // PORTRAIT LABELS
-      // Front Left (Bottom Left) - tighter spacing (w-190)
-      drawHelpBox(renderer, w - 190, h - 80, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT);
+      // Front Left (Bottom Left) - Reverted to w-150 for tightness
+      drawHelpBox(renderer, w - 150, h - 80, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT);
 
       // Front Right (Bottom Right)
       drawHelpBox(renderer, w - 10, h - 80, "1x: Text size +\nHold: Rotate\n2x: AntiAlias", BoxAlign::RIGHT);
@@ -912,11 +919,11 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       // LANDSCAPE CCW LABELS
 
       // Top Buttons (Top Edge - configuration)
-      // Left (was Left) - shifted right by 25
-      drawHelpBox(renderer, w / 2 + 25, 20, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT);
+      // Left (was Left) - shifted right by 20
+      drawHelpBox(renderer, w / 2 + 20, 20, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT);
 
-      // Right (was Right) - shifted right by 35
-      drawHelpBox(renderer, w / 2 + 35, 20, "1x: Text size +\nHold: Rotate\n2x: AntiAlias", BoxAlign::LEFT);
+      // Right (was Right) - shifted right by 30
+      drawHelpBox(renderer, w / 2 + 30, 20, "1x: Text size +\nHold: Rotate\n2x: AntiAlias", BoxAlign::LEFT);
     }
   }
 
@@ -926,7 +933,8 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   const_cast<GfxRenderer&>(renderer).setFadingFix(true);
 
   if (pagesUntilFullRefresh <= 1) {
-    // Revert to HALF_REFRESH to test "Soft" cleaning
+    // "Double Tap" Half Refresh to clear bias without seizure
+    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
     renderer.displayBuffer(HalDisplay::HALF_REFRESH);
     pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
   } else {
