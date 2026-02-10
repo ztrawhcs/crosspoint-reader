@@ -21,8 +21,10 @@ namespace {
 constexpr unsigned long skipChapterMs = 700;
 constexpr unsigned long goHomeMs = 1000;
 constexpr unsigned long formattingToggleMs = 500;
-// New constant for double click speed
 constexpr unsigned long doubleClickMs = 300;
+
+// Global state for the Help Overlay (since we can't modify the header)
+static bool showHelpOverlay = false;
 
 constexpr int statusBarMargin = 19;
 constexpr int progressBarMarginTop = 1;
@@ -37,7 +39,6 @@ int clampPercent(int percent) {
   return percent;
 }
 
-// Apply the logical reader orientation to the renderer.
 void applyReaderOrientation(GfxRenderer& renderer, const uint8_t orientation) {
   switch (orientation) {
     case CrossPointSettings::ORIENTATION::PORTRAIT:
@@ -55,6 +56,17 @@ void applyReaderOrientation(GfxRenderer& renderer, const uint8_t orientation) {
     default:
       break;
   }
+}
+
+// Helper to draw a text box with a background to make it readable over text
+void drawHelpBox(GfxRenderer& renderer, int x, int y, const char* text, bool alignRight = false) {
+  int w = renderer.getTextWidth(SMALL_FONT_ID, text) + 10;
+  int h = 40;  // approximate height for 3 lines
+  int drawX = alignRight ? (x - w) : x;
+  
+  renderer.drawRect(Rect{drawX, y, w, h}, 1); // White fill
+  renderer.drawRect(Rect{drawX, y, w, h}, 0); // Black border
+  renderer.drawText(SMALL_FONT_ID, drawX + 5, y + 5, text);
 }
 
 }  // namespace
@@ -130,11 +142,28 @@ void EpubReaderActivity::onExit() {
 }
 
 void EpubReaderActivity::loop() {
-  // --- POPUP AUTO-DISMISS LOGIC ---
+  // --- POPUP AUTO-DISMISS ---
   static unsigned long clearPopupTimer = 0;
   if (clearPopupTimer > 0 && millis() > clearPopupTimer) {
     clearPopupTimer = 0;
     updateRequired = true;
+  }
+
+  // --- HELP OVERLAY INTERCEPTION ---
+  // If overlay is showing, ANY button press dismisses it.
+  if (showHelpOverlay) {
+    if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) ||
+        mappedInput.wasReleased(MappedInputManager::Button::Back) ||
+        mappedInput.wasReleased(MappedInputManager::Button::Left) ||
+        mappedInput.wasReleased(MappedInputManager::Button::Right) ||
+        mappedInput.wasReleased(MappedInputManager::Button::PageBack) ||
+        mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
+      showHelpOverlay = false;
+      updateRequired = true;
+      return; 
+    }
+    // Block other logic while overlay is shown
+    return;
   }
 
   // --- DOUBLE CLICK STATE ---
@@ -143,7 +172,6 @@ void EpubReaderActivity::loop() {
   static unsigned long lastFormatIncRelease = 0;
   static bool waitingForFormatInc = false;
 
-  // Pass input responsibility to sub activity if exists
   if (subActivity) {
     subActivity->loop();
     if (pendingSubactivityExit) {
@@ -182,8 +210,16 @@ void EpubReaderActivity::loop() {
     return;
   }
 
-  // Enter reader menu activity.
+  // --- CONFIRM BUTTON (MENU / HELP) ---
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    if (mappedInput.getHeldTime() > formattingToggleMs) {
+      // Long Press: Toggle Help Overlay
+      showHelpOverlay = true;
+      updateRequired = true;
+      return; 
+    }
+
+    // Short Press: Open Menu
     xSemaphoreTake(renderingMutex, portMAX_DELAY);
     const int currentPage = section ? section->currentPage + 1 : 0;
     const int totalPages = section ? section->pageCount : 0;
@@ -201,13 +237,11 @@ void EpubReaderActivity::loop() {
     xSemaphoreGive(renderingMutex);
   }
 
-  // Long press BACK (1s+) goes to file selection
   if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= goHomeMs) {
     onGoBack();
     return;
   }
 
-  // Short press BACK goes directly to home
   if (mappedInput.wasReleased(MappedInputManager::Button::Back) && mappedInput.getHeldTime() < goHomeMs) {
     onGoHome();
     return;
@@ -234,15 +268,13 @@ void EpubReaderActivity::loop() {
     btnNavNext = MappedInputManager::Button::Right;
   }
 
-  // --- HANDLE FORMAT DEC (Left/Top) ---
-  // Actions: Short (Size-), Long (Spacing), Double (Align)
-
+  // --- HANDLE FORMAT DEC ---
   bool executeFormatDecSingle = false;
 
   if (mappedInput.wasReleased(btnFormatDec)) {
     if (mappedInput.getHeldTime() > formattingToggleMs) {
-      // Long Press: Cycle Spacing (Immediate)
-      waitingForFormatDec = false;  // Cancel any pending
+      // Long Press: Cycle Spacing
+      waitingForFormatDec = false;
       xSemaphoreTake(renderingMutex, portMAX_DELAY);
       if (section) {
         cachedSpineIndex = currentSpineIndex;
@@ -267,7 +299,6 @@ void EpubReaderActivity::loop() {
       updateRequired = true;
       return;
     } else {
-      // Short Press detected - check if it's a double click
       if (waitingForFormatDec && (millis() - lastFormatDecRelease < doubleClickMs)) {
         // DOUBLE CLICK: Toggle Alignment
         waitingForFormatDec = false;
@@ -277,7 +308,6 @@ void EpubReaderActivity::loop() {
           cachedChapterTotalPageCount = section->pageCount;
           nextPageNumber = section->currentPage;
         }
-        // Toggle between LEFT_ALIGN and JUSTIFIED
         if (SETTINGS.paragraphAlignment == CrossPointSettings::PARAGRAPH_ALIGNMENT::LEFT_ALIGN) {
           SETTINGS.paragraphAlignment = CrossPointSettings::PARAGRAPH_ALIGNMENT::JUSTIFIED;
           GUI.drawPopup(renderer, "Align: Justified");
@@ -292,14 +322,12 @@ void EpubReaderActivity::loop() {
         updateRequired = true;
         return;
       } else {
-        // First click - start waiting
         waitingForFormatDec = true;
         lastFormatDecRelease = millis();
       }
     }
   }
 
-  // Check for timeout on pending single click
   if (waitingForFormatDec && (millis() - lastFormatDecRelease > doubleClickMs)) {
     waitingForFormatDec = false;
     executeFormatDecSingle = true;
@@ -333,14 +361,12 @@ void EpubReaderActivity::loop() {
     }
   }
 
-  // --- HANDLE FORMAT INC (Right/Top) ---
-  // Actions: Short (Size+), Long (Rotate), Double (Anti-Alias)
-
+  // --- HANDLE FORMAT INC ---
   bool executeFormatIncSingle = false;
 
   if (mappedInput.wasReleased(btnFormatInc)) {
     if (mappedInput.getHeldTime() > formattingToggleMs) {
-      // Long Press: Toggle Orientation (Immediate)
+      // Long Press: Toggle Orientation
       waitingForFormatInc = false;
       uint8_t newOrientation = (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT)
                                    ? CrossPointSettings::ORIENTATION::LANDSCAPE_CCW
@@ -352,7 +378,6 @@ void EpubReaderActivity::loop() {
       updateRequired = true;
       return;
     } else {
-      // Short Press detected
       if (waitingForFormatInc && (millis() - lastFormatIncRelease < doubleClickMs)) {
         // DOUBLE CLICK: Toggle Anti-Aliasing
         waitingForFormatInc = false;
@@ -372,14 +397,12 @@ void EpubReaderActivity::loop() {
         updateRequired = true;
         return;
       } else {
-        // First click
         waitingForFormatInc = true;
         lastFormatIncRelease = millis();
       }
     }
   }
 
-  // Check for timeout
   if (waitingForFormatInc && (millis() - lastFormatIncRelease > doubleClickMs)) {
     waitingForFormatInc = false;
     executeFormatIncSingle = true;
@@ -414,16 +437,11 @@ void EpubReaderActivity::loop() {
   }
 
   // --- HANDLE NAVIGATION BUTTONS ---
-
   const bool usePressForPageTurn = !SETTINGS.longPressChapterSkip;
-
-  // Logic to detect navigation trigger based on current mapping
   const bool prevTriggered =
       usePressForPageTurn ? mappedInput.wasPressed(btnNavPrev) : mappedInput.wasReleased(btnNavPrev);
-
   const bool powerPageTurn = SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::PAGE_TURN &&
                              mappedInput.wasReleased(MappedInputManager::Button::Power);
-
   const bool nextTriggered = usePressForPageTurn ? (mappedInput.wasPressed(btnNavNext) || powerPageTurn)
                                                  : (mappedInput.wasReleased(btnNavNext) || powerPageTurn);
 
@@ -438,7 +456,6 @@ void EpubReaderActivity::loop() {
     return;
   }
 
-  const bool isHoldingNav = mappedInput.isPressed(btnNavPrev) || mappedInput.isPressed(btnNavNext);
   const bool skipChapter = SETTINGS.longPressChapterSkip && mappedInput.getHeldTime() > skipChapterMs;
 
   if (skipChapter) {
@@ -822,6 +839,49 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
                                         const int orientedMarginLeft) {
   page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
   renderStatusBar(orientedMarginRight, orientedMarginBottom, orientedMarginLeft);
+  
+  // --- HELP OVERLAY RENDERING ---
+  if (showHelpOverlay) {
+    const int w = renderer.getScreenWidth();
+    const int h = renderer.getScreenHeight();
+    
+    // Dim the reading background slightly if possible, or just draw on top
+    // Since we don't have alpha, we just draw readable boxes.
+    
+    // NOTE: Coordinates are RAW screen pixels, need to respect orientation
+    // But since we are drawing absolute button labels, we want logical positions?
+    // Actually, renderer is already rotated. So (0,0) is top-left of *current view*.
+    
+    // Draw Center "Dismiss" instruction
+    drawHelpBox(renderer, w / 2 - 50, h / 2 - 20, "PRESS ANY KEY\nTO DISMISS");
+
+    if (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) {
+        // PORTRAIT LABELS
+        
+        // Side Buttons (Right Edge)
+        drawHelpBox(renderer, w - 10, 50, "Prev Page", true);
+        drawHelpBox(renderer, w - 10, h - 150, "Next Page", true);
+        
+        // Front Left (Bottom Left)
+        drawHelpBox(renderer, 20, h - 60, "1x: Size -\n2x: Align\nHold: Space");
+        
+        // Front Right (Bottom Right)
+        drawHelpBox(renderer, w - 20, h - 60, "1x: Size +\n2x: AntiAlias\nHold: ROTATE", true);
+        
+    } else {
+        // LANDSCAPE CCW LABELS
+        // Screen is rotated. Top is physical Side buttons. Right is physical Front buttons.
+        
+        // Top Buttons (Top Edge)
+        drawHelpBox(renderer, 20, 10, "1x: Size -\n2x: Align\nHold: Space");
+        drawHelpBox(renderer, w - 20, 10, "1x: Size +\n2x: AntiAlias\nHold: ROTATE", true);
+        
+        // Right Buttons (Right Edge)
+        drawHelpBox(renderer, w - 10, 50, "Prev Page", true);
+        drawHelpBox(renderer, w - 10, h - 50, "Next Page", true);
+    }
+  }
+
   if (pagesUntilFullRefresh <= 1) {
     renderer.displayBuffer(HalDisplay::HALF_REFRESH);
     pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
@@ -832,7 +892,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
 
   renderer.storeBwBuffer();
 
-  if (SETTINGS.textAntiAliasing) {
+  if (SETTINGS.textAntiAliasing && !showHelpOverlay) { // Don't anti-alias the help overlay
     renderer.clearScreen(0x00);
     renderer.setRenderMode(GfxRenderer::GRAYSCALE_LSB);
     page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
