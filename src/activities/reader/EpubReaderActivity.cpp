@@ -4,9 +4,10 @@
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
-#include <vector>
-#include <string>
+
 #include <sstream>
+#include <string>
+#include <vector>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
@@ -69,33 +70,33 @@ void drawHelpBox(const GfxRenderer& renderer, int x, int y, const char* text, bo
   std::stringstream ss(text);
   std::string line;
   int maxWidth = 0;
-  
+
   while (std::getline(ss, line, '\n')) {
-      lines.push_back(line);
-      int w = renderer.getTextWidth(SMALL_FONT_ID, line.c_str());
-      if (w > maxWidth) maxWidth = w;
+    lines.push_back(line);
+    int w = renderer.getTextWidth(SMALL_FONT_ID, line.c_str());
+    if (w > maxWidth) maxWidth = w;
   }
 
-  int lineHeight = 20; // Approx height for SMALL_FONT_ID
+  int lineHeight = 20;  // Approx height for SMALL_FONT_ID
   int boxWidth = maxWidth + 10;
   int boxHeight = (lines.size() * lineHeight) + 10;
-  
+
   int drawX = alignRight ? (x - boxWidth) : x;
   int drawY = y;
 
   // Ensure we don't draw off the bottom edge
   if (drawY + boxHeight > renderer.getScreenHeight()) {
-      drawY = renderer.getScreenHeight() - boxHeight - 5;
+    drawY = renderer.getScreenHeight() - boxHeight - 5;
   }
 
   // Fill White (Clear background)
   renderer.fillRect(drawX, drawY, boxWidth, boxHeight, false);
   // Draw Border Black
   renderer.drawRect(drawX, drawY, boxWidth, boxHeight, true);
-  
+
   // Draw each line
   for (size_t i = 0; i < lines.size(); i++) {
-      renderer.drawText(SMALL_FONT_ID, drawX + 5, drawY + 5 + (i * lineHeight), lines[i].c_str());
+    renderer.drawText(SMALL_FONT_ID, drawX + 5, drawY + 5 + (i * lineHeight), lines[i].c_str());
   }
 }
 
@@ -891,11 +892,11 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
 
     } else {
       // LANDSCAPE CCW LABELS
-      
+
       // Top Buttons (Top Edge - configuration)
       // Left (was Left)
       drawHelpBox(renderer, 20, 20, "1x: Size -\n2x: Align\nHold: Spacing");
-      
+
       // Right (was Right)
       drawHelpBox(renderer, w - 20, 20, "1x: Size +\n2x: AntiAlias\nHold: ROTATE", true);
     }
