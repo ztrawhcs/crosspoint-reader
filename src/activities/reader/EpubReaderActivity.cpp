@@ -103,7 +103,15 @@ void drawHelpBox(const GfxRenderer& renderer, int x, int y, const char* text, Bo
 
   // Draw each line
   for (size_t i = 0; i < lines.size(); i++) {
-    renderer.drawText(SMALL_FONT_ID, drawX + 5, y + 5 + (i * lineHeight), lines[i].c_str());
+    int lineX = drawX + 5; // Default left alignment inside box
+    
+    // Calculate center alignment relative to the box width if requested
+    if (align == BoxAlign::CENTER) {
+        int lineWidth = renderer.getTextWidth(SMALL_FONT_ID, lines[i].c_str());
+        lineX = drawX + (boxWidth - lineWidth) / 2;
+    }
+    
+    renderer.drawText(SMALL_FONT_ID, lineX, y + 5 + (i * lineHeight), lines[i].c_str());
   }
 }
 
@@ -891,8 +899,8 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
 
     if (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) {
       // PORTRAIT LABELS
-      // Front Left (Bottom Left)
-      drawHelpBox(renderer, w - 145, h - 80, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT);
+      // Front Left (Bottom Left) - tighter spacing
+      drawHelpBox(renderer, w - 130, h - 80, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT);
 
       // Front Right (Bottom Right)
       drawHelpBox(renderer, w - 10, h - 80, "1x: Text size +\nHold: Rotate\n2x: AntiAlias", BoxAlign::RIGHT);
@@ -901,11 +909,11 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       // LANDSCAPE CCW LABELS
 
       // Top Buttons (Top Edge - configuration)
-      // Left (was Left)
-      drawHelpBox(renderer, w / 2, 20, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT);
+      // Left (was Left) - shifted right by 15
+      drawHelpBox(renderer, w / 2 + 15, 20, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT);
 
-      // Right (was Right) - Moved +10px
-      drawHelpBox(renderer, w / 2 + 10, 20, "1x: Text size +\nHold: Rotate\n2x: AntiAlias", BoxAlign::LEFT);
+      // Right (was Right) - shifted right by 15
+      drawHelpBox(renderer, w / 2 + 25, 20, "1x: Text size +\nHold: Rotate\n2x: AntiAlias", BoxAlign::LEFT);
     }
   }
 
