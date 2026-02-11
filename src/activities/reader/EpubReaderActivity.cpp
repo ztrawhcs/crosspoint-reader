@@ -68,6 +68,10 @@ enum class BoxAlign { LEFT, RIGHT, CENTER };
 
 // Helper to draw multi-line text cleanly
 void drawHelpBox(const GfxRenderer& renderer, int x, int y, const char* text, BoxAlign align) {
+  // Use a slightly larger font for better readability
+  const auto FONT_ID = UI_12_FONT_ID;
+  const int LINE_HEIGHT_PX = 24; // Increased for larger font
+
   // Split text into lines
   std::vector<std::string> lines;
   std::stringstream ss(text);
@@ -76,13 +80,12 @@ void drawHelpBox(const GfxRenderer& renderer, int x, int y, const char* text, Bo
 
   while (std::getline(ss, line, '\n')) {
     lines.push_back(line);
-    int w = renderer.getTextWidth(SMALL_FONT_ID, line.c_str());
+    int w = renderer.getTextWidth(FONT_ID, line.c_str());
     if (w > maxWidth) maxWidth = w;
   }
 
-  int lineHeight = 20;  // Approx height for SMALL_FONT_ID
-  int boxWidth = maxWidth + 10;
-  int boxHeight = (lines.size() * lineHeight) + 10;
+  int boxWidth = maxWidth + 14; // A bit more padding
+  int boxHeight = (lines.size() * LINE_HEIGHT_PX) + 14;
 
   int drawX = x;
   if (align == BoxAlign::RIGHT) {
@@ -103,15 +106,15 @@ void drawHelpBox(const GfxRenderer& renderer, int x, int y, const char* text, Bo
 
   // Draw each line
   for (size_t i = 0; i < lines.size(); i++) {
-    int lineX = drawX + 5;  // Default left alignment inside box
+    int lineX = drawX + 7;  // Default left alignment inside box (increased padding)
 
     // Calculate center alignment relative to the box width if requested
     if (align == BoxAlign::CENTER) {
-      int lineWidth = renderer.getTextWidth(SMALL_FONT_ID, lines[i].c_str());
+      int lineWidth = renderer.getTextWidth(FONT_ID, lines[i].c_str());
       lineX = drawX + (boxWidth - lineWidth) / 2;
     }
 
-    renderer.drawText(SMALL_FONT_ID, lineX, y + 5 + (i * lineHeight), lines[i].c_str());
+    renderer.drawText(FONT_ID, lineX, y + 7 + (i * LINE_HEIGHT_PX), lines[i].c_str());
   }
 }
 
@@ -209,7 +212,8 @@ void EpubReaderActivity::loop() {
         mappedInput.wasReleased(MappedInputManager::Button::Left) ||
         mappedInput.wasReleased(MappedInputManager::Button::Right) ||
         mappedInput.wasReleased(MappedInputManager::Button::PageBack) ||
-        mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
+        mappedInput.wasReleased(MappedInputManager::Button::PageForward) ||
+        mappedInput.wasReleased(MappedInputManager::Button::Power)) { // Added Power button
       showHelpOverlay = false;
       updateRequired = true;
       return;
@@ -898,19 +902,19 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     const int h = renderer.getScreenHeight();
 
     // Draw Center "Dismiss" instruction
-    // Landscape: y = 300 (lowered to be below buttons)
-    // Portrait: y = 500 (lowered to be visually centered/lower half)
-    int dismissY = (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) ? 500 : 300;
+    // Landscape: y = 250 (lowered)
+    // Portrait: y = 300 (hardcoded vertical center-ish)
+    int dismissY = (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) ? 300 : 250;
 
-    // Landscape adjustment for center (matching the shift of the top buttons)
+    // Landscape adjustment for center
     int dismissX = (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) ? w / 2 : w / 2 + 25;
 
     drawHelpBox(renderer, dismissX, dismissY, "PRESS ANY KEY\nTO DISMISS", BoxAlign::CENTER);
 
     if (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) {
       // PORTRAIT LABELS
-      // Front Left (Bottom Left) - Corrected to w-168 to be close but not touching
-      drawHelpBox(renderer, w - 168, h - 80, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT);
+      // Front Left (Bottom Left) - Reverted to w-150 for tightness
+      drawHelpBox(renderer, w - 150, h - 80, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT);
 
       // Front Right (Bottom Right)
       drawHelpBox(renderer, w - 10, h - 80, "1x: Text size +\nHold: Rotate\n2x: AntiAlias", BoxAlign::RIGHT);
@@ -927,17 +931,26 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     }
   }
 
-  // --- SAFE FADING FIX IMPLEMENTATION ---
-  // Enable fading fix (shutdown after render) ONLY for this specific update
-  // This avoids the boot loop issue caused by global enabling in onEnter()
-  const_cast<GfxRenderer&>(renderer).setFadingFix(true);
+  // --- SAFE FADING FIX IMPLEMENTATION (FASTER) ---
+  // We want to clear the haze WITHOUT the slow "triple flash" full refresh.
+  // The trick:
+  // 1. Disable the fix first to keep rails on (fast render)
+  // 2. Render twice rapidly (half refresh) to scrub ghosting
+  // 3. Enable the fix at the very end to power down (prevents future drift)
 
   if (pagesUntilFullRefresh <= 1) {
-    // "Double Tap" Half Refresh to clear bias without seizure
+    const_cast<GfxRenderer&>(renderer).setFadingFix(false);
     renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+
+    const_cast<GfxRenderer&>(renderer).setFadingFix(true);
     renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+
     pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
   } else {
+    // Normal page turn - just render once
+    // (Optional: can toggle fading fix here too if drift happens on every page,
+    // but usually only needed periodically)
+    const_cast<GfxRenderer&>(renderer).setFadingFix(true);
     renderer.displayBuffer();
     pagesUntilFullRefresh--;
   }
