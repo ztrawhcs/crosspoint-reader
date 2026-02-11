@@ -67,7 +67,8 @@ void applyReaderOrientation(GfxRenderer& renderer, const uint8_t orientation) {
 enum class BoxAlign { LEFT, RIGHT, CENTER };
 
 // Helper to draw multi-line text cleanly
-void drawHelpBox(const GfxRenderer& renderer, int x, int y, const char* text, BoxAlign align, int32_t fontId, int lineHeight) {
+void drawHelpBox(const GfxRenderer& renderer, int x, int y, const char* text, BoxAlign align, int32_t fontId,
+                 int lineHeight) {
   // Split text into lines
   std::vector<std::string> lines;
   std::stringstream ss(text);
@@ -80,11 +81,8 @@ void drawHelpBox(const GfxRenderer& renderer, int x, int y, const char* text, Bo
     if (w > maxWidth) maxWidth = w;
   }
 
-  int padding = 14; 
-  if (fontId == SMALL_FONT_ID) {
-      padding = 10; // Slightly less padding for the smaller font
-  }
-
+  // Increased padding for better vertical spacing
+  int padding = 20;
   int boxWidth = maxWidth + padding;
   int boxHeight = (lines.size() * lineHeight) + padding;
 
@@ -102,18 +100,14 @@ void drawHelpBox(const GfxRenderer& renderer, int x, int y, const char* text, Bo
 
   // Fill White (Clear background)
   renderer.fillRect(drawX, y, boxWidth, boxHeight, false);
-  // Draw Border Black (Thickness: 2)
-  renderer.drawRect(drawX, y, boxWidth, boxHeight, 2, true);
+  // Draw Border Black (Thickness: 4 for Bold)
+  renderer.drawRect(drawX, y, boxWidth, boxHeight, 4, true);
 
   // Draw each line
   for (size_t i = 0; i < lines.size(); i++) {
-    int lineX = drawX + (padding / 2);  // Default left alignment inside box
-
-    // Calculate center alignment relative to the box width if requested
-    if (align == BoxAlign::CENTER) {
-      int lineWidth = renderer.getTextWidth(fontId, lines[i].c_str());
-      lineX = drawX + (boxWidth - lineWidth) / 2;
-    }
+    // ALWAYS center text horizontally within the box
+    int lineWidth = renderer.getTextWidth(fontId, lines[i].c_str());
+    int lineX = drawX + (boxWidth - lineWidth) / 2;
 
     renderer.drawText(fontId, lineX, y + (padding / 2) + (i * lineHeight), lines[i].c_str());
   }
@@ -908,12 +902,12 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       overlayFontId = SMALL_FONT_ID;
       overlayLineHeight = 20;
 
-      // Draw Center "Dismiss" instruction - Centered vertically
-      drawHelpBox(renderer, w / 2, h / 2, "PRESS ANY KEY\nTO DISMISS", BoxAlign::CENTER, overlayFontId,
+      // Draw Center "Dismiss" instruction - Centered vertically (500)
+      drawHelpBox(renderer, w / 2, 500, "PRESS ANY KEY\nTO DISMISS", BoxAlign::CENTER, overlayFontId,
                   overlayLineHeight);
 
-      // Front Left (Bottom Left) - Reverted to w-150 for smaller font
-      drawHelpBox(renderer, w - 150, h - 80, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT,
+      // Front Left (Bottom Left) - Reverted to w-160 for smaller font
+      drawHelpBox(renderer, w - 160, h - 80, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT,
                   overlayFontId, overlayLineHeight);
 
       // Front Right (Bottom Right)
@@ -925,7 +919,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       overlayFontId = NOTOSANS_14_FONT_ID;
       overlayLineHeight = 26;
 
-      // Draw Center "Dismiss" instruction - Below buttons
+      // Draw Center "Dismiss" instruction - Below buttons (300)
       drawHelpBox(renderer, w / 2 + 25, 300, "PRESS ANY KEY\nTO DISMISS", BoxAlign::CENTER, overlayFontId,
                   overlayLineHeight);
 
@@ -940,7 +934,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     }
   }
 
-  // --- STANDARD REFRESH (Reverted to original behavior) ---
+  // --- STANDARD REFRESH (Original behavior) ---
   if (pagesUntilFullRefresh <= 1) {
     renderer.displayBuffer(HalDisplay::HALF_REFRESH);
     pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
