@@ -898,19 +898,19 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     const int h = renderer.getScreenHeight();
 
     // Draw Center "Dismiss" instruction
-    // Landscape: y = 250 (lowered)
-    // Portrait: y = 300 (hardcoded vertical center-ish)
-    int dismissY = (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) ? 300 : 250;
-    
-    // Landscape adjustment for center
+    // Landscape: y = 300 (lowered to be below buttons)
+    // Portrait: y = 500 (lowered to be visually centered/lower half)
+    int dismissY = (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) ? 500 : 300;
+
+    // Landscape adjustment for center (matching the shift of the top buttons)
     int dismissX = (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) ? w / 2 : w / 2 + 25;
 
     drawHelpBox(renderer, dismissX, dismissY, "PRESS ANY KEY\nTO DISMISS", BoxAlign::CENTER);
 
     if (SETTINGS.orientation == CrossPointSettings::ORIENTATION::PORTRAIT) {
       // PORTRAIT LABELS
-      // Front Left (Bottom Left) - Reverted to w-150 for tightness
-      drawHelpBox(renderer, w - 150, h - 80, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT);
+      // Front Left (Bottom Left) - Corrected to w-168 to be close but not touching
+      drawHelpBox(renderer, w - 168, h - 80, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT);
 
       // Front Right (Bottom Right)
       drawHelpBox(renderer, w - 10, h - 80, "1x: Text size +\nHold: Rotate\n2x: AntiAlias", BoxAlign::RIGHT);
