@@ -2,6 +2,7 @@
 
 #include <GfxRenderer.h>
 
+#include "CrossPointSettings.h"
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -65,6 +66,13 @@ void EpubReaderMenuActivity::loop() {
     if (selectedAction == MenuAction::ROTATE_SCREEN) {
       // Cycle orientation preview locally; actual rotation happens on menu exit.
       pendingOrientation = (pendingOrientation + 1) % orientationLabels.size();
+      updateRequired = true;
+      return;
+    }
+
+    if (selectedAction == MenuAction::BUTTON_MOD_SETTINGS) {
+      SETTINGS.buttonModMode = (SETTINGS.buttonModMode + 1) % CrossPointSettings::BUTTON_MOD_MODE_COUNT;
+      SETTINGS.saveToFile();
       updateRequired = true;
       return;
     }
@@ -136,6 +144,12 @@ void EpubReaderMenuActivity::renderScreen() {
     if (menuItems[i].action == MenuAction::ROTATE_SCREEN) {
       // Render current orientation value on the right edge of the content area.
       const auto value = orientationLabels[pendingOrientation];
+      const auto width = renderer.getTextWidth(UI_10_FONT_ID, value);
+      renderer.drawText(UI_10_FONT_ID, contentX + contentWidth - 20 - width, displayY, value, !isSelected);
+    }
+
+    if (menuItems[i].action == MenuAction::BUTTON_MOD_SETTINGS) {
+      const auto value = buttonModLabels[SETTINGS.buttonModMode];
       const auto width = renderer.getTextWidth(UI_10_FONT_ID, value);
       renderer.drawText(UI_10_FONT_ID, contentX + contentWidth - 20 - width, displayY, value, !isSelected);
     }
