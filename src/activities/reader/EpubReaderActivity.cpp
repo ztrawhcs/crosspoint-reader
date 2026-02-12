@@ -945,8 +945,8 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       // Far Left Box (Back Button) -> Dark Mode
       drawHelpBox(renderer, 10, h - 80, "2x: Dark", BoxAlign::LEFT, overlayFontId, overlayLineHeight);
 
-      // Front Left (Left Rocker) -> Spacing/Align
-      drawHelpBox(renderer, w - 160, h - 80, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT,
+      // Front Left (Left Rocker) -> Spacing/Align (Gap tightened: w-145)
+      drawHelpBox(renderer, w - 145, h - 80, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT,
                   overlayFontId, overlayLineHeight);
 
       // Front Right (Right Rocker)
@@ -956,15 +956,15 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     } else {
       // LANDSCAPE CCW LABELS
 
-      // Top Left Corner (Back Button) -> Dark Mode
-      drawHelpBox(renderer, 20, 20, "2x Back: Dark", BoxAlign::LEFT, overlayFontId, overlayLineHeight);
+      // Bottom Right Corner -> Dark Mode
+      drawHelpBox(renderer, w - 10, h - 40, "2x Back: Dark", BoxAlign::RIGHT, overlayFontId, overlayLineHeight);
 
-      // Top Right Cluster (Buttons)
-      // Left part of cluster
+      // Top Buttons (Top Edge - configuration)
+      // Left (was Left) - shifted right by 20
       drawHelpBox(renderer, w / 2 + 20, 20, "1x: Text size –\nHold: Spacing\n2x: Alignment", BoxAlign::RIGHT,
                   overlayFontId, overlayLineHeight);
 
-      // Right part of cluster
+      // Right (was Right) - shifted right by 30
       drawHelpBox(renderer, w / 2 + 30, 20, "1x: Text size +\nHold: Rotate\n2x: AntiAlias", BoxAlign::LEFT,
                   overlayFontId, overlayLineHeight);
     }
