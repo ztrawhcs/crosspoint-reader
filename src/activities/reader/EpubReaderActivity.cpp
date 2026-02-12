@@ -223,10 +223,6 @@ void EpubReaderActivity::loop() {
   static unsigned long lastFormatIncRelease = 0;
   static bool waitingForFormatInc = false;
 
-  // Double click state for Back button (Dark Mode Toggle)
-  static unsigned long lastBackRelease = 0;
-  static bool waitingForBack = false;
-
   if (subActivity) {
     subActivity->loop();
     if (pendingSubactivityExit) {
@@ -300,6 +296,10 @@ void EpubReaderActivity::loop() {
 
   // In FULL mode, use delay to detect double click for Dark Mode
   if (SETTINGS.buttonModMode == CrossPointSettings::MOD_FULL) {
+    // These static vars are scoped here to satisfy cppcheck
+    static unsigned long lastBackRelease = 0;
+    static bool waitingForBack = false;
+
     if (mappedInput.wasReleased(MappedInputManager::Button::Back) && mappedInput.getHeldTime() < goHomeMs) {
       if (waitingForBack && (millis() - lastBackRelease < doubleClickMs)) {
         // DOUBLE CLICK DETECTED: Toggle Dark Mode
