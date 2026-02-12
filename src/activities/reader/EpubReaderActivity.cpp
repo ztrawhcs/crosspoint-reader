@@ -957,7 +957,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       // LANDSCAPE CCW LABELS
 
       // Bottom Right Corner -> Dark Mode
-      drawHelpBox(renderer, w - 10, h - 40, "2x Back: Dark", BoxAlign::RIGHT, overlayFontId, overlayLineHeight);
+      drawHelpBox(renderer, w - 10, h - 40, "2x: Dark", BoxAlign::RIGHT, overlayFontId, overlayLineHeight);
 
       // Top Buttons (Top Edge - configuration)
       // Left (was Left) - shifted right by 20
