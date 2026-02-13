@@ -241,5 +241,3 @@ std::unique_ptr<Page> Section::loadPageFromSectionFile() {
   file.close();
   return page;
 }
-
-}
