@@ -10,8 +10,6 @@ void GfxRenderer::begin() {
   }
 }
 
-void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) { fontMap.insert({fontId, font}); }
-
 // Translate logical (x,y) coordinates to physical panel coordinates based on current orientation
 // This should always be inlined for better performance
 static inline void rotateCoordinates(const GfxRenderer::Orientation orientation, const int x, const int y, int* phyX,
@@ -57,7 +55,8 @@ void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
 
   // Bounds checking against physical panel dimensions
   if (phyX < 0 || phyX >= HalDisplay::DISPLAY_WIDTH || phyY < 0 || phyY >= HalDisplay::DISPLAY_HEIGHT) {
-    Serial.printf("[%lu] [GFX] !! Outside range (%d, %d) -> (%d, %d)\n", millis(), x, y, phyX, phyY);
+    // Suppress spam in tight loops, uncomment for debugging
+    // Serial.printf("[%lu] [GFX] !! Outside range (%d, %d) -> (%d, %d)\n", millis(), x, y, phyX, phyY);
     return;
   }
 
@@ -71,6 +70,8 @@ void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
     frameBuffer[byteIndex] |= 1 << bitPosition;  // Set bit
   }
 }
+
+void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) { fontMap.insert({fontId, font}); }
 
 int GfxRenderer::getTextWidth(const int fontId, const char* text, const EpdFontFamily::Style style) const {
   if (fontMap.count(fontId) == 0) {
@@ -655,7 +656,7 @@ void GfxRenderer::invertScreen() const {
 
 void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const {
   auto elapsed = millis() - start_ms;
-  Serial.printf("[%lu] [GFX] Time = %lu ms from clearScreen to displayBuffer\n", millis(), elapsed);
+  // Serial.printf("[%lu] [GFX] Time = %lu ms from clearScreen to displayBuffer\n", millis(), elapsed);
   display.displayBuffer(refreshMode, fadingFix);
 }
 
@@ -726,6 +727,11 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text) const {
   int width = 0;
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
     width += fontMap.at(fontId).getGlyph(cp, EpdFontFamily::REGULAR)->advanceX;
+    
+    // CUSTOM TRACKING: Reduce spacing by 1px in forced bold mode
+    if (EpdFontFamily::globalForceBold && cp != ' ' && cp != 0x00A0) {
+      width -= 1;
+    }
   }
   return width;
 }
@@ -836,6 +842,11 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 
     // Move to next character position (going up, so decrease Y)
     yPos -= glyph->advanceX;
+    
+    // CUSTOM TRACKING: Reduce spacing by 1px in forced bold mode
+    if (EpdFontFamily::globalForceBold && cp != ' ' && cp != 0x00A0) {
+      yPos += 1;
+    }
   }
 }
 
@@ -892,8 +903,7 @@ bool GfxRenderer::storeBwBuffer() {
     memcpy(bwBufferChunks[i], frameBuffer + offset, BW_BUFFER_CHUNK_SIZE);
   }
 
-  Serial.printf("[%lu] [GFX] Stored BW buffer in %zu chunks (%zu bytes each)\n", millis(), BW_BUFFER_NUM_CHUNKS,
-                BW_BUFFER_CHUNK_SIZE);
+  // Serial.printf("[%lu] [GFX] Stored BW buffer in %zu chunks (%zu bytes each)\n", millis(), BW_BUFFER_NUM_CHUNKS, BW_BUFFER_CHUNK_SIZE);
   return true;
 }
 
@@ -932,7 +942,7 @@ void GfxRenderer::restoreBwBuffer() {
   display.cleanupGrayscaleBuffers(frameBuffer);
 
   freeBwBufferChunks();
-  Serial.printf("[%lu] [GFX] Restored and freed BW buffer chunks\n", millis());
+  // Serial.printf("[%lu] [GFX] Restored and freed BW buffer chunks\n", millis());
 }
 
 /**
@@ -1006,6 +1016,11 @@ void GfxRenderer::renderChar(const EpdFontFamily& fontFamily, const uint32_t cp,
   }
 
   *x += glyph->advanceX;
+  
+  // CUSTOM TRACKING: Reduce spacing by 1px in forced bold mode
+  if (EpdFontFamily::globalForceBold && cp != ' ' && cp != 0x00A0) {
+    *x -= 1;
+  }
 }
 
 void GfxRenderer::getOrientedViewableTRBL(int* outTop, int* outRight, int* outBottom, int* outLeft) const {
@@ -1035,4 +1050,6 @@ void GfxRenderer::getOrientedViewableTRBL(int* outTop, int* outRight, int* outBo
       *outLeft = VIEWABLE_MARGIN_TOP;
       break;
   }
+}
+
 }
