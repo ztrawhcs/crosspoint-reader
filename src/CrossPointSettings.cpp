@@ -363,5 +363,3 @@ int CrossPointSettings::getReaderFontId() const {
       }
   }
 }
-
-}
