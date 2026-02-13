@@ -1051,5 +1051,3 @@ void GfxRenderer::getOrientedViewableTRBL(int* outTop, int* outRight, int* outBo
       break;
   }
 }
-
-}
