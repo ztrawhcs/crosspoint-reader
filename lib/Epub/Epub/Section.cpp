@@ -84,7 +84,7 @@ bool Section::loadSectionFile(const int fontId, const float lineCompression, con
     bool fileHyphenationEnabled;
     bool fileEmbeddedStyle;
     bool fileForceBold;
-    
+
     serialization::readPod(file, fileFontId);
     serialization::readPod(file, fileLineCompression);
     serialization::readPod(file, fileExtraParagraphSpacing);
@@ -176,10 +176,10 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
   if (!Storage.openFileForWrite("SCT", filePath, file)) {
     return false;
   }
-  
+
   writeSectionFileHeader(fontId, lineCompression, extraParagraphSpacing, paragraphAlignment, viewportWidth,
                          viewportHeight, hyphenationEnabled, embeddedStyle, forceBold);
-                         
+
   std::vector<uint32_t> lut = {};
 
   ChapterHtmlSlimParser visitor(
@@ -187,7 +187,7 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
       viewportHeight, hyphenationEnabled,
       [this, &lut](std::unique_ptr<Page> page) { lut.emplace_back(this->onPageComplete(std::move(page))); },
       embeddedStyle, popupFn, embeddedStyle ? epub->getCssParser() : nullptr);
-      
+
   Hyphenator::setPreferredLanguage(epub->getLanguage());
   success = visitor.parseAndBuildPages();
 
@@ -201,7 +201,7 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
 
   const uint32_t lutOffset = file.position();
   bool hasFailedLutRecords = false;
-  
+
   for (const uint32_t& pos : lut) {
     if (pos == 0) {
       hasFailedLutRecords = true;
