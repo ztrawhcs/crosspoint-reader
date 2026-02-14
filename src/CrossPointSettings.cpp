@@ -8,33 +8,24 @@
 
 #include "fontIds.h"
 
-// Initialize the static instance
 CrossPointSettings CrossPointSettings::instance;
 
 void readAndValidate(FsFile& file, uint8_t& member, const uint8_t maxValue) {
   uint8_t tempValue;
   serialization::readPod(file, tempValue);
-  if (tempValue < maxValue) {
-    member = tempValue;
-  }
+  if (tempValue < maxValue) member = tempValue;
 }
 
 namespace {
 constexpr uint8_t SETTINGS_FILE_VERSION = 1;
-// Increment this when adding new persisted settings fields
-constexpr uint8_t SETTINGS_COUNT = 33;
+constexpr uint8_t SETTINGS_COUNT = 34;
 constexpr char SETTINGS_FILE[] = "/.crosspoint/settings.bin";
 
-// Validate front button mapping to ensure each hardware button is unique.
-// If duplicates are detected, reset to the default physical order to prevent invalid mappings.
 void validateFrontButtonMapping(CrossPointSettings& settings) {
-  // Snapshot the logical->hardware mapping so we can compare for duplicates.
-  const uint8_t mapping[] = {settings.frontButtonBack, settings.frontButtonConfirm, settings.frontButtonLeft,
-                             settings.frontButtonRight};
+  const uint8_t mapping[] = {settings.frontButtonBack, settings.frontButtonConfirm, settings.frontButtonLeft, settings.frontButtonRight};
   for (size_t i = 0; i < 4; i++) {
     for (size_t j = i + 1; j < 4; j++) {
       if (mapping[i] == mapping[j]) {
-        // Duplicate detected: restore the default physical order (Back, Confirm, Left, Right).
         settings.frontButtonBack = CrossPointSettings::FRONT_HW_BACK;
         settings.frontButtonConfirm = CrossPointSettings::FRONT_HW_CONFIRM;
         settings.frontButtonLeft = CrossPointSettings::FRONT_HW_LEFT;
@@ -45,7 +36,6 @@ void validateFrontButtonMapping(CrossPointSettings& settings) {
   }
 }
 
-// Convert legacy front button layout into explicit logical->hardware mapping.
 void applyLegacyFrontButtonLayout(CrossPointSettings& settings) {
   switch (static_cast<CrossPointSettings::FRONT_BUTTON_LAYOUT>(settings.frontButtonLayout)) {
     case CrossPointSettings::LEFT_RIGHT_BACK_CONFIRM:
@@ -78,13 +68,9 @@ void applyLegacyFrontButtonLayout(CrossPointSettings& settings) {
 }  // namespace
 
 bool CrossPointSettings::saveToFile() const {
-  // Make sure the directory exists
   Storage.mkdir("/.crosspoint");
-
   FsFile outputFile;
-  if (!Storage.openFileForWrite("CPS", SETTINGS_FILE, outputFile)) {
-    return false;
-  }
+  if (!Storage.openFileForWrite("CPS", SETTINGS_FILE, outputFile)) return false;
 
   serialization::writePod(outputFile, SETTINGS_FILE_VERSION);
   serialization::writePod(outputFile, SETTINGS_COUNT);
@@ -93,7 +79,7 @@ bool CrossPointSettings::saveToFile() const {
   serialization::writePod(outputFile, shortPwrBtn);
   serialization::writePod(outputFile, statusBar);
   serialization::writePod(outputFile, orientation);
-  serialization::writePod(outputFile, frontButtonLayout);  // legacy
+  serialization::writePod(outputFile, frontButtonLayout);
   serialization::writePod(outputFile, sideButtonLayout);
   serialization::writePod(outputFile, fontFamily);
   serialization::writePod(outputFile, fontSize);
@@ -121,34 +107,27 @@ bool CrossPointSettings::saveToFile() const {
   serialization::writePod(outputFile, buttonModMode);
   serialization::writeString(outputFile, std::string(blePageTurnerMac));
   serialization::writePod(outputFile, forceBoldText);
+  serialization::writePod(outputFile, swapPortraitControls);
 
-  // New fields added at end for backward compatibility
   outputFile.close();
-
   Serial.printf("[%lu] [CPS] Settings saved to file\n", millis());
   return true;
 }
 
 bool CrossPointSettings::loadFromFile() {
   FsFile inputFile;
-  if (!Storage.openFileForRead("CPS", SETTINGS_FILE, inputFile)) {
-    return false;
-  }
+  if (!Storage.openFileForRead("CPS", SETTINGS_FILE, inputFile)) return false;
 
   uint8_t version;
   serialization::readPod(inputFile, version);
   if (version != SETTINGS_FILE_VERSION) {
-    Serial.printf("[%lu] [CPS] Deserialization failed: Unknown version %u\n", millis(), version);
     inputFile.close();
     return false;
   }
 
   uint8_t fileSettingsCount = 0;
   serialization::readPod(inputFile, fileSettingsCount);
-
-  // load settings that exist (support older files with fewer fields)
   uint8_t settingsRead = 0;
-  // Track whether remap fields were present in the settings file.
   bool frontButtonMappingRead = false;
   do {
     readAndValidate(inputFile, sleepScreen, SLEEP_SCREEN_MODE_COUNT);
@@ -161,7 +140,7 @@ bool CrossPointSettings::loadFromFile() {
     if (++settingsRead >= fileSettingsCount) break;
     readAndValidate(inputFile, orientation, ORIENTATION_COUNT);
     if (++settingsRead >= fileSettingsCount) break;
-    readAndValidate(inputFile, frontButtonLayout, FRONT_BUTTON_LAYOUT_COUNT);  // legacy
+    readAndValidate(inputFile, frontButtonLayout, FRONT_BUTTON_LAYOUT_COUNT);
     if (++settingsRead >= fileSettingsCount) break;
     readAndValidate(inputFile, sideButtonLayout, SIDE_BUTTON_LAYOUT_COUNT);
     if (++settingsRead >= fileSettingsCount) break;
@@ -229,8 +208,6 @@ bool CrossPointSettings::loadFromFile() {
     if (++settingsRead >= fileSettingsCount) break;
     readAndValidate(inputFile, buttonModMode, BUTTON_MOD_MODE_COUNT);
     if (++settingsRead >= fileSettingsCount) break;
-
-    // Load BLE MAC Address
     {
       std::string macStr;
       serialization::readString(inputFile, macStr);
@@ -238,21 +215,16 @@ bool CrossPointSettings::loadFromFile() {
       blePageTurnerMac[sizeof(blePageTurnerMac) - 1] = '\0';
     }
     if (++settingsRead >= fileSettingsCount) break;
-
     serialization::readPod(inputFile, forceBoldText);
     if (++settingsRead >= fileSettingsCount) break;
-
-    // New fields added at end for backward compatibility
+    serialization::readPod(inputFile, swapPortraitControls);
+    if (++settingsRead >= fileSettingsCount) break;
   } while (false);
 
-  if (frontButtonMappingRead) {
-    validateFrontButtonMapping(*this);
-  } else {
-    applyLegacyFrontButtonLayout(*this);
-  }
+  if (frontButtonMappingRead) validateFrontButtonMapping(*this);
+  else applyLegacyFrontButtonLayout(*this);
 
   inputFile.close();
-  Serial.printf("[%lu] [CPS] Settings loaded from file\n", millis());
   return true;
 }
 
@@ -261,66 +233,42 @@ float CrossPointSettings::getReaderLineCompression() const {
     case BOOKERLY:
     default:
       switch (lineSpacing) {
-        case TIGHT:
-          return 0.95f;
-        case NORMAL:
-        default:
-          return 1.0f;
-        case WIDE:
-          return 1.1f;
+        case TIGHT: return 0.95f;
+        case NORMAL: default: return 1.0f;
+        case WIDE: return 1.1f;
       }
     case NOTOSANS:
       switch (lineSpacing) {
-        case TIGHT:
-          return 0.90f;
-        case NORMAL:
-        default:
-          return 0.95f;
-        case WIDE:
-          return 1.0f;
+        case TIGHT: return 0.90f;
+        case NORMAL: default: return 0.95f;
+        case WIDE: return 1.0f;
       }
     case OPENDYSLEXIC:
       switch (lineSpacing) {
-        case TIGHT:
-          return 0.90f;
-        case NORMAL:
-        default:
-          return 0.95f;
-        case WIDE:
-          return 1.0f;
+        case TIGHT: return 0.90f;
+        case NORMAL: default: return 0.95f;
+        case WIDE: return 1.0f;
       }
   }
 }
 
 unsigned long CrossPointSettings::getSleepTimeoutMs() const {
   switch (sleepTimeout) {
-    case SLEEP_1_MIN:
-      return 1UL * 60 * 1000;
-    case SLEEP_5_MIN:
-      return 5UL * 60 * 1000;
-    case SLEEP_10_MIN:
-    default:
-      return 10UL * 60 * 1000;
-    case SLEEP_15_MIN:
-      return 15UL * 60 * 1000;
-    case SLEEP_30_MIN:
-      return 30UL * 60 * 1000;
+    case SLEEP_1_MIN: return 1UL * 60 * 1000;
+    case SLEEP_5_MIN: return 5UL * 60 * 1000;
+    case SLEEP_10_MIN: default: return 10UL * 60 * 1000;
+    case SLEEP_15_MIN: return 15UL * 60 * 1000;
+    case SLEEP_30_MIN: return 30UL * 60 * 1000;
   }
 }
 
 int CrossPointSettings::getRefreshFrequency() const {
   switch (refreshFrequency) {
-    case REFRESH_1:
-      return 1;
-    case REFRESH_5:
-      return 5;
-    case REFRESH_10:
-      return 10;
-    case REFRESH_15:
-    default:
-      return 15;
-    case REFRESH_30:
-      return 30;
+    case REFRESH_1: return 1;
+    case REFRESH_5: return 5;
+    case REFRESH_10: return 10;
+    case REFRESH_15: default: return 15;
+    case REFRESH_30: return 30;
   }
 }
 
@@ -329,41 +277,24 @@ int CrossPointSettings::getReaderFontId() const {
     case BOOKERLY:
     default:
       switch (fontSize) {
-        case SMALL:
-          return BOOKERLY_12_FONT_ID;
-        case MEDIUM:
-        default:
-          return BOOKERLY_14_FONT_ID;
-        case LARGE:
-          return BOOKERLY_16_FONT_ID;
-        case EXTRA_LARGE:
-          return BOOKERLY_18_FONT_ID;
+        case SMALL: return BOOKERLY_12_FONT_ID;
+        case MEDIUM: default: return BOOKERLY_14_FONT_ID;
+        case LARGE: return BOOKERLY_16_FONT_ID;
+        case EXTRA_LARGE: return BOOKERLY_18_FONT_ID;
       }
     case NOTOSANS:
       switch (fontSize) {
-        case SMALL:
-          return NOTOSANS_12_FONT_ID;
-        case MEDIUM:
-        default:
-          return NOTOSANS_14_FONT_ID;
-        case LARGE:
-          return NOTOSANS_16_FONT_ID;
-        case EXTRA_LARGE:
-          return NOTOSANS_18_FONT_ID;
+        case SMALL: return NOTOSANS_12_FONT_ID;
+        case MEDIUM: default: return NOTOSANS_14_FONT_ID;
+        case LARGE: return NOTOSANS_16_FONT_ID;
+        case EXTRA_LARGE: return NOTOSANS_18_FONT_ID;
       }
     case OPENDYSLEXIC:
       switch (fontSize) {
-        case SMALL:
-          return OPENDYSLEXIC_8_FONT_ID;
-        case MEDIUM:
-        default:
-          return OPENDYSLEXIC_10_FONT_ID;
-        case LARGE:
-          return OPENDYSLEXIC_12_FONT_ID;
-        case EXTRA_LARGE:
-          return OPENDYSLEXIC_14_FONT_ID;
+        case SMALL: return OPENDYSLEXIC_8_FONT_ID;
+        case MEDIUM: default: return OPENDYSLEXIC_10_FONT_ID;
+        case LARGE: return OPENDYSLEXIC_12_FONT_ID;
+        case EXTRA_LARGE: return OPENDYSLEXIC_14_FONT_ID;
       }
   }
-}
-
 }
