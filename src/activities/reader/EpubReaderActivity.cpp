@@ -26,7 +26,7 @@ constexpr unsigned long skipChapterMs = 700;
 constexpr unsigned long goHomeMs = 1000;
 constexpr unsigned long formattingToggleMs = 500;
 // New constant for double click speed
-constexpr unsigned long doubleClickMs = 300;
+constexpr unsigned long doubleClickMs = 400;
 
 // Global state for the Help Overlay and Night Mode
 static bool showHelpOverlay = false;
